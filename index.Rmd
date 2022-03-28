@@ -18,34 +18,128 @@ library(dplyr)
 library(ggplot2)
 library(plotly)
 library(Cairo)
+library(tidymodels)
+library(ggdendro)
+library(heatmaply)
+library(knitr)
+library(dendextend)
 ```
 
+
+
+### Week 12: Dendograms
+
+```{r week 12, echo=FALSE, fig.show="hold", out.width="50%"}
+
+get_conf_mat <- function(fit) {
+  outcome <- .get_tune_outcome_names(fit)
+  fit %>% 
+    collect_predictions() %>% 
+    conf_mat(truth = outcome, estimate = .pred_class)
+}  
+
+get_pr <- function(fit) {
+  fit %>% 
+    conf_mat_resampled() %>% 
+    group_by(Prediction) %>% mutate(precision = Freq / sum(Freq)) %>% 
+    group_by(Truth) %>% mutate(recall = Freq / sum(Freq)) %>% 
+    ungroup() %>% filter(Prediction == Truth) %>% 
+    select(class = Prediction, precision, recall)
+}  
+
+femkemetal <-
+  get_playlist_audio_features("bnfcollection", "0xKB9peSIoqMIexrmubkV3") %>%
+  add_audio_analysis() %>%
+  mutate(
+    segments = map2(segments, key, compmus_c_transpose),
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      ),
+    timbre =
+      map(
+        segments,
+        compmus_summarise, timbre,
+        method = "mean"
+      )
+  ) %>%
+  mutate(pitches = map(pitches, compmus_normalise, "clr")) %>%
+  mutate_at(vars(pitches, timbre), map, bind_rows) %>%
+  unnest(cols = c(pitches, timbre)) %>% slice_sample(n = 15)
+spotifymetal <-
+  get_playlist_audio_features("bnfcollection", "37i9dQZF1DX9qNs32fujYe") %>%
+  add_audio_analysis() %>%
+  mutate(
+    segments = map2(segments, key, compmus_c_transpose),
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      ),
+    timbre =
+      map(
+        segments,
+        compmus_summarise, timbre,
+        method = "mean"
+      )
+  ) %>%
+  mutate(pitches = map(pitches, compmus_normalise, "clr")) %>%
+  mutate_at(vars(pitches, timbre), map, bind_rows) %>%
+  unnest(cols = c(pitches, timbre)) %>% slice_sample(n = 15)
+
+metal <-
+  bind_rows(
+    femkemetal %>% mutate(playlist = "Femke's metal") %>% slice_head(n = 15),
+    spotifymetal %>% mutate(playlist = "Spotify's metal") %>% slice_head(n = 15)
+  ) 
+
+metal_juice <-
+  recipe(
+    track.name ~
+      danceability +
+      energy +
+      loudness +
+      speechiness +
+      acousticness +
+      instrumentalness +
+      liveness +
+      valence +
+      tempo +
+      duration +
+      C + `C#|Db` + D + `D#|Eb` +
+      E + `F` + `F#|Gb` + G +
+      `G#|Ab` + A + `A#|Bb` + B +
+      c01 + c02 + c03 + c04 + c05 + c06 +
+      c07 + c08 + c09 + c10 + c11 + c12,
+    data = metal
+  ) %>%
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors()) %>% 
+  prep(metal %>% mutate(track.name = str_trunc(track.name, 30))) %>%
+  juice() %>%
+  column_to_rownames("track.name")
+
+metal_dist <- dist(metal_juice, method = "euclidean")
+
+metal_dist %>% 
+  hclust(method = "complete") %>% 
+  dendro_data() %>%
+  ggdendrogram()
+
+```
+
+***
+commentaar
 
 
 ### Week 11: Tempograms
 
 ```{r week 11, echo=FALSE, fig.show="hold", out.width="50%"}
 
+knitr::include_graphics("tempogramblacklist.png")
 
-blacklist <- get_tidy_audio_analysis("3iUJrkMilUVkUKtYZK7Th4")
-
-blacklist %>%
-  tempogram(window_size = 8, hop_size = 1, cyclic = FALSE) %>%
-  ggplot(aes(x = time, y = bpm, fill = power)) +
-  geom_raster() +
-  scale_fill_viridis_c(guide = "none") +
-  labs(x = "Time (s)", y = "Tempo (BPM)", title = "Tempogram of 'Blacklist' by Exodus") +
-  theme_classic()
-
-archangel <- get_tidy_audio_analysis("63aGgWIoGfl3wxykzje8eJ")
-
-archangel %>%
-  tempogram(window_size = 8, hop_size = 1, cyclic = TRUE) %>%
-  ggplot(aes(x = time, y = bpm, fill = power)) +
-  geom_raster() +
-  scale_fill_viridis_c(guide = "none") +
-  labs(x = "Time (s)", y = "Tempo (BPM)", title = "Cyclic tempogram of 'Archangel' by Amaranthe") +
-  theme_classic()
+knitr::include_graphics("tempogramarchangel.png")
 
 ```
 
@@ -168,7 +262,7 @@ trooper <-
 
 trooper %>% 
   compmus_match_pitch_template(
-    key_templates,         
+    chord_templates,         
     method = "euclidean",  
     norm = "manhattan"     
   ) %>%
@@ -195,7 +289,7 @@ maximus <-
 
 maximus %>% 
   compmus_match_pitch_template(
-    key_templates,         
+    chord_templates,         
     method = "euclidean",  
     norm = "manhattan"     
   ) %>%
@@ -217,6 +311,8 @@ maximus %>%
 
 ***
 commentaar
+
+
 
 ### Week 9: Cepstrograms and Self-Similarity Matrices
 
@@ -307,7 +403,7 @@ Painkiller %>%
   coord_fixed() +
   scale_fill_viridis_c(guide = "none") +
   theme_classic() +
-  labs(x = "", y = "")
+  labs(x = "", y = "") + ggtitle("Cepstrogram of 'Painkiller' by Judas Priest")
 
 ```
 
@@ -318,7 +414,10 @@ Painkiller %>%
 <iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/2JwQ5NZzqLYyKEKJhfsItN?utm_source=generator" width="100%" height="80" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
 
 ***
-commentaar
+These are two cepstrograms of songs by artists typical of my corpora. The first cepstrogram is from the song Painkiller by Judas Priest. This musician/band is typical for my own heavy metal playlist because of their frequent recurrence. The first thing to notice is the obvious yellow bar in the second dimension. This can be explained by the almost constant double bass played by the drummer. It is the only sound that occurs at the beginning of the song and only drops out at the end. It does seem as if c02 contains another sound, as the drums completely disappear but this layer still remains dark green. After listening several times, it also seems to me that c01 consists of the sound of the rhythmic guitars, c06 represents the vocals and c03 represents certain screaming vocals of the singer.
+
+The second cepstrogram is from Powerwolf's song "Demons are a girl's best friend". Powerwolf is a typical artist for Spotify's heavy metal playlist. This song has a less clear structure. Firstly, the dominant sound here is an organ, represented in c02. Underneath, the next dominant layer is the rhythmic guitars and drums, represented in c01. I believe the sixth dimension represents the vocals and according to the fourth, a church bell can be heard at the beginning and end. Finally, in c03 you can see that the high-pitched sound of a triangle-like instrument returns from time to time.
+
 
 ### Week 8: Chromagrams
 
@@ -423,11 +522,11 @@ playlistsplot <- playlists %>%
       x = energy,
       y = tempo,
       size = instrumentalness,
-      colour = mode
+      colour = mode,
+      label = track.name
     )
   ) +
-  geom_point(alpha = 0.65
-  ) +
+  geom_point(alpha = 0.65) +
   geom_rug(size = 0.1) +
   geom_text(
     aes(
@@ -460,10 +559,10 @@ playlistsplot <- playlists %>%
     breaks = c(0.3, 0.50, 1),
     minor_breaks = NULL
     ) +
-  scale_colour_brewer(
+    scale_colour_brewer(
      type = "qual",
       palette = "Set2",
-     ) +
+)+
     scale_size_continuous(      
     trans = "exp",
     guide = "bins"
@@ -477,7 +576,7 @@ playlistsplot <- playlists %>%
     title = "Energy, tempo, instrumentalness and mode of Femke's and Spotify's playlists"
   )
 
-ggplotly(playlistsplot)
+ggplotly(playlistsplot, tooltip = c('label', 'x', 'y', 'size'))
 
 ```
 
