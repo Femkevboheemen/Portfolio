@@ -635,6 +635,7 @@ The second tempogram is of ‘Archangel’ by Amaranthe for which I chose to dis
 
 It is very interesting to see that both these songs have a very steady tempo with a small distortion at the solo or bridge. The weird part is that they have such a difference in BPM-value. I think this is because heavy metal songs get their energy from their constant tempo and beat, which is why almost every time the value is doubled or tripled in the case of Archangel. It seems the actual value of the tempo does not really matter as both these songs are ranked quite high in energy. 
 
+
 ### Spotify features do not influence the way the playlists cluster
 
 ```{r echo=FALSE, fig.show="hold", out.width="50%"}
@@ -647,7 +648,6 @@ knitr::include_graphics("dendrogram.png")
 This is a dendrogram of 15 random numbers from both corpora. The songs from my own playlist are coloured orange and those from Spotify's playlist are coloured blue. 
 
 Since it's a random selection from the playlists, the dendrogram is different every time it's knitted. However, in general there is not much difference between all versions. Usually, the songs from both playlists are well mixed. There is a bit of clustering where more songs from my list are together and Spotify's are too, but not enough to really see a big difference.
-
 
 ### Conclusion: I have a good ear
 
